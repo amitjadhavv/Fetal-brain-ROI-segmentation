@@ -82,7 +82,5 @@ class MRIDataset(Dataset):
             subject = self.transform(subject)
             img = subject['image'].data
             mask = subject['mask'].data  # Add channel dimension back
-        if self.class_mapping is not None:
-            mask = remap_labels(mask, self.class_mapping)
 
         return img, mask
