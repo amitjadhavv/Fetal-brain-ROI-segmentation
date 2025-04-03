@@ -6,17 +6,17 @@ class Config:
 
     @classmethod
     def get_image_paths(cls):
-        images = sorted(os.listdir(os.path.join(cls.dir_path, "cropped-images")))
-        return [os.path.join(cls.dir_path, "cropped-images", i) for i in images]
+        images = sorted(os.listdir(os.path.join(cls.dir_path, "new_images")))
+        return [os.path.join(cls.dir_path, "new_images", i) for i in images]
 
     @classmethod
     def get_mask_paths(cls):
-        masks = sorted(os.listdir(os.path.join(cls.dir_path, "cropped-labels")))
-        return [os.path.join(cls.dir_path, "cropped-labels", i) for i in masks]
+        masks = sorted(os.listdir(os.path.join(cls.dir_path, "new_global_heatmaps")))
+        return [os.path.join(cls.dir_path, "new_global_heatmaps", i) for i in masks]
 
 # Hyperparameters
-    BATCH_SIZE = 8
+    BATCH_SIZE = 1
     LEARNING_RATE = 1e-3
-    NUM_CLASSES = 5
-    NUM_EPOCHS = 100
+    NUM_CLASSES = 2
+    NUM_EPOCHS = 2
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
