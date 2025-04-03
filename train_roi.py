@@ -5,6 +5,7 @@ from Datasets.dataset import MRIDataset
 from models.VNet import VNet
 import torchio as tio
 from configs.config import Config
+from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
 import  json
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -27,9 +28,9 @@ if torch.cuda.device_count()>1:
     model = DataParallel(model)
 model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
-#dice_loss_fn = DiceLoss(include_background=True, softmax=False, squared_pred=True, reduction="mean")
+dice_loss_fn = DiceLoss(include_background=True, softmax=False, squared_pred=True, reduction="mean")
 dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
-kl_loss_fn = torch.nn.KLDivLoss(reduction="batchmean")
+kl_loss_fn = torch.nn.KLDivLoss(reduction="mean")
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
 scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
 train_loss_history = []
@@ -56,14 +57,14 @@ for epoch in range(Config.NUM_EPOCHS):
             print("⚠️ NaN or Inf detected in heatmaps!")
 
         # Forward pass
-        # dice_loss = dice_loss_fn(outputs, heatmaps)
+        dice_loss = dice_loss_fn(outputs, heatmaps)
         log_outputs = torch.log(torch.clamp(outputs, min=1e-12))
         kl_loss = kl_loss_fn(input=log_outputs, target=heatmaps)
         #print(f"KL Loss: {kl_loss.item()}, ")
         # print(f"Output min/max: {outputs.min().item()} / {outputs.max().item()}")
         # print(f"Heatmap min/max: {heatmaps.min().item()} / {heatmaps.max().item()}")
         # print(f"Sum of heatmaps (should be close to 1): {heatmaps.sum(dim=1).min().item()} - {heatmaps.sum(dim=1).max().item()}")
-        loss = kl_loss
+        loss = kl_loss + dice_loss
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
