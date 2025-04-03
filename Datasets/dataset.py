@@ -4,17 +4,12 @@ from torch.utils.data import Dataset
 import nibabel as nib
 import numpy as np
 import torch.nn.functional as F
-import torchio as tio  # For optional data augmentation
-
+import torchio as tio
 from torch.utils.data import DataLoader
-def remap_labels(labels, mapping):
-    remapped_labels = labels.clone()
-    for old, new in mapping.items():
-        remapped_labels[labels == old] = new
-    return remapped_labels
+
 
 class MRIDataset(Dataset):
-    def __init__(self, image_paths, mask_paths, split="train",class_mapping=None, train_ratio=0.9, val_ratio=0.0, test_ratio=0.10,
+    def __init__(self, image_paths, mask_paths, split="train", train_ratio=0.9, val_ratio=0.0,
                  seed=123, transform=None, augmentation_factor=1):
         """
         Args:
@@ -26,7 +21,6 @@ class MRIDataset(Dataset):
         self.mask_paths = mask_paths
         self.split = split
         self.transform = transform
-        self.class_mapping = class_mapping
         self.augmentation_factor = augmentation_factor
 
         # Shuffle data with seed
