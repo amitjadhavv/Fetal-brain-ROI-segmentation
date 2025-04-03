@@ -29,7 +29,7 @@ model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
 #dice_loss_fn = DiceLoss(include_background=True, softmax=False, squared_pred=True, reduction="mean")
 dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
-kl_loss_fn = torch.nn.KLDivLoss(reduction="mean")
+kl_loss_fn = torch.nn.KLDivLoss(reduction="batchmean")
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
 scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
 train_loss_history = []
