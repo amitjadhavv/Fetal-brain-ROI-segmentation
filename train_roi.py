@@ -59,7 +59,7 @@ for epoch in range(Config.NUM_EPOCHS):
         outputs = torch.sigmoid(outputs)
         probs = torch.sigmoid(outputs)
         probs = probs.clamp(min=1e-8, max=1.0 - 1e-8)
-        threshold = 0.5
+        threshold = 0.1
         pred_bin = (probs >= threshold).float()
         heatmaps_bin = (heatmaps >= threshold).float()
         dice_loss = dice_loss_fn(pred_bin, pred_bin)
