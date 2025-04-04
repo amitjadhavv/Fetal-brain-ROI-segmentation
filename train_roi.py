@@ -73,11 +73,11 @@ for epoch in range(Config.NUM_EPOCHS):
     current_lr = scheduler.get_last_lr()[0]
     print(f"Epoch {epoch+1}/{Config.NUM_EPOCHS}, Train Loss: {train_loss:.4f}, Time: {epoch_time:.2f} seconds, Epoch {epoch+1} , Current LR: {current_lr}")
     scheduler.step()
-model_save_path = "V_net_model_roi1.pth"
+model_save_path = "V_net_model_roi.pth"
 torch.save(model.state_dict(), model_save_path)
 print(f"Model state dictionary saved to {model_save_path}")
 loss_history = {
     "train_loss": train_loss_history
 }
-with open("loss_history_roi1.json", "w") as f:
+with open("loss_history_roi.json", "w") as f:
     json.dump(loss_history, f)
