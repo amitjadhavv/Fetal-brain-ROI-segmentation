@@ -6,8 +6,6 @@ def dice_loss(pred, target, smooth=1e-6):
     dice = (2. * intersection + smooth) / (pred.sum(dim=(1, 2, 3)) + target.sum(dim=(1, 2, 3)) + smooth)
     return 1 - dice.mean()
 
-import torch
-
 def binary_weighted_dice_loss(pred, target, weight=1.0, smooth=1e-6):
     """
     Computes the binary weighted Dice loss for 3D segmentation.

@@ -5,14 +5,15 @@ from Datasets.dataset import MRIDataset
 from models.VNet import VNet
 import torchio as tio
 from configs.config import Config
-from monai.losses import DiceLoss
-from monai.metrics import DiceMetric
+# from monai.losses import DiceLoss
+# from monai.metrics import DiceMetric
 import  json
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import time
 import torch.nn.functional as F
 import warnings
-
+from utils.metrics import dice_coefficient_thresholded
+# from utils.loss import dice_loss
 # This ignores *all* warnings of any category
 warnings.simplefilter('ignore')
 # Define augmentations using torchio
@@ -32,8 +33,8 @@ if torch.cuda.device_count()>1:
     model = DataParallel(model)
 model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
-dice_loss_fn = DiceLoss(include_background=False, squared_pred=True, reduction="mean")
-dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
+# dice_loss_fn = dice_loss(include_background=True, squared_pred=True, reduction="mean")
+# dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
 kl_loss_fn = torch.nn.KLDivLoss(reduction="batchmean")
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
 scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
@@ -56,26 +57,15 @@ for epoch in range(Config.NUM_EPOCHS):
         # target_probs = torch.clamp(target_probs, min=1e-8)
         # target_probs = target_probs / target_probs.sum()
         kl_loss = kl_loss_fn(input=pred_probs, target=heatmaps)
-        outputs = torch.sigmoid(outputs)
         probs = torch.sigmoid(outputs)
-        probs = probs.clamp(min=1e-8, max=1.0 - 1e-8)
-        threshold = 0.1
-        pred_bin = (probs >= threshold).float()
-        heatmaps_bin = (heatmaps >= threshold).float()
-        print("pred_bin unique:", torch.unique(pred_bin))
-        print("heatmaps_bin unique:", torch.unique(heatmaps_bin))
-        dice_loss = dice_loss_fn(pred_bin, pred_bin)
-        print("diceloss: ",dice_loss)
-        loss = kl_loss + dice_loss
+        loss = kl_loss
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
-        dice = dice_metric(y_pred=pred_bin, y=heatmaps_bin)
-        if dice.ndim > 0:
-            dice = dice.mean()
-        train_metric += dice.item()
+        dice = dice_coefficient_thresholded(probs,heatmaps)
+        train_metric += dice
     train_loss /= len(train_dataloader)
     train_loss_history.append(train_loss)
     train_metric /= len(train_dataloader)

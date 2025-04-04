@@ -6,36 +6,39 @@ def dice_coefficient(pred, target, smooth=1e-6):
     dice = (2. * intersection + smooth) / (pred.sum(dim=(1, 2, 3)) + target.sum(dim=(1, 2, 3)) + smooth)
     return dice.mean().item()
 
-def multiclass_dice_coefficient(pred, target, num_classes, smooth=1e-6):
+def dice_coefficient_thresholded(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    threshold: float = 0.1,
+    eps: float = 1e-8
+) -> torch.Tensor:
     """
-    Computes the multi-class Dice coefficient.
+    Computes a threshold-based Dice coefficient for predicted and target
+    heatmaps (both in [0..1], but not necessarily strictly binary).
+
+    1. Threshold pred and target at `threshold` to get binary masks.
+    2. Compute standard Dice overlap on those binary masks.
 
     Args:
-        pred (torch.Tensor): Model predictions with shape [B, C, D, H, W].
-        target (torch.Tensor): Ground truth with shape [B, D, H, W].
-        num_classes (int): Number of classes.
-        smooth (float): Smoothing factor to avoid division by zero.
+        pred:  shape [N, 1, D, H, W], each voxel in [0..1]
+        target: shape [N, 1, D, H, W], each voxel in [0..1]
+                (e.g. a Gaussian heatmap).
+        threshold: voxel values >= threshold become 1, else 0
+        eps: small constant to avoid division by zero
 
     Returns:
-        float: Mean Dice coefficient across all classes.
+        A scalar Tensor with mean Dice across the batch.
     """
-    dice_scores = []
+    # 1) Binarize both predicted and target heatmaps
+    pred_bin = (pred >= threshold).float()
+    target_bin = (target >= threshold).float()
 
-    # Ensure target tensor has no extra channel dimension
-    if target.ndim == 5 and target.size(1) == 1:
-        target = target.squeeze(1)  # Convert [B, 1, D, H, W] to [B, D, H, W]
+    # 2) Flatten batch + spatial dims so we can do sum easily
+    pred_bin_flat = pred_bin.view(pred_bin.size(0), -1)
+    target_bin_flat = target_bin.view(target_bin.size(0), -1)
 
-    for c in range(num_classes):
-        # Extract predictions for class c
-        pred_c = pred[:, c]  # Shape: [B, D, H, W]
-        target_c = (target == c).float()  # Binary mask for class c, Shape: [B, D, H, W]
+    intersection = (pred_bin_flat * target_bin_flat).sum(dim=1)
+    union = pred_bin_flat.sum(dim=1) + target_bin_flat.sum(dim=1)
 
-        # Compute Dice for class c
-        intersection = (pred_c * target_c).sum(dim=(1, 2, 3))  # Intersection over batch
-        dice = (2. * intersection + smooth) / (
-                pred_c.sum(dim=(1, 2, 3)) + target_c.sum(dim=(1, 2, 3)) + smooth
-        )
-        dice_scores.append(dice.mean().item())  # Average Dice for the class
-
-    # Return mean Dice score across all classes
-    return sum(dice_scores) / num_classes
+    dice_per_sample = (2.0 * intersection + eps) / (union + eps)
+    return dice_per_sample.mean()
