@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 def dice_loss(pred, target, smooth=1e-6):
-    pred = torch.sigmoid(pred)  # Ensure predictions are probabilities
+    # pred = torch.sigmoid(pred)  # Ensure predictions are probabilities
     intersection = (pred * target).sum(dim=(1, 2, 3))
     dice = (2. * intersection + smooth) / (pred.sum(dim=(1, 2, 3)) + target.sum(dim=(1, 2, 3)) + smooth)
     return 1 - dice.mean()

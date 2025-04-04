@@ -7,15 +7,14 @@ from models.VNet import VNet
 
 image_paths = Config.get_image_paths()
 mask_paths = Config.get_mask_paths()
-class_mapping = {0: 0, 1: 1, 3: 2, 4: 3, 6: 4}
 # Load the test dataset
-test_dataset = MRIDataset(image_paths, mask_paths, split="test",class_mapping=class_mapping)
+test_dataset = MRIDataset(image_paths, mask_paths, split="test")
 test_dataloader = DataLoader(test_dataset, batch_size=Config.BATCH_SIZE, shuffle=False)
 
 dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
 
 model = VNet(num_classes=Config.NUM_CLASSES).to(Config.DEVICE)
-model_path = "V_net_model_cropped.pth"
+model_path = "V_net_model_roi.pth"
 
 state_dict = torch.load(model_path)
 # Remove 'module.' prefix if present

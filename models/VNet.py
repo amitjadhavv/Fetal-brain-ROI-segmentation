@@ -52,4 +52,4 @@ class VNet(nn.Module):
         dec1 = self.decoder1(torch.cat([F.interpolate(dec2, scale_factor=2, mode="trilinear", align_corners=True), enc1], dim=1))
 
         output = self.final_conv(dec1)
-        return output
+        return torch.sigmoid(output)

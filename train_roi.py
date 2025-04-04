@@ -12,8 +12,8 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 import time
 import torch.nn.functional as F
 import warnings
-from utils.metrics import dice_coefficient_thresholded
-# from utils.loss import dice_loss
+from utils.metrics import dice_coefficient
+from utils.loss import dice_loss
 # This ignores *all* warnings of any category
 warnings.simplefilter('ignore')
 # Define augmentations using torchio
@@ -35,7 +35,7 @@ model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
 # dice_loss_fn = dice_loss(include_background=True, squared_pred=True, reduction="mean")
 # dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
-kl_loss_fn = torch.nn.KLDivLoss(reduction="batchmean")
+# kl_loss_fn = torch.nn.KLDivLoss(reduction="batchmean")
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
 scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
 train_loss_history = []
@@ -48,23 +48,22 @@ for epoch in range(Config.NUM_EPOCHS):
     for images, heatmaps in train_dataloader:
         images, heatmaps = images.to(Config.DEVICE), heatmaps.to(Config.DEVICE)
         outputs = model(images)
-        pred_map = F.relu(outputs)
-        map_sum = pred_map.sum(dim=1, keepdim=True) + 1e-8
-        pred_probs = pred_map / map_sum
+        # pred_map = F.relu(outputs)
+        # map_sum = pred_map.sum(dim=1, keepdim=True) + 1e-8
+        # pred_probs = pred_map / map_sum
         # Forward pass
-        pred_probs = torch.log(torch.clamp(pred_probs, min=1e-8))
+        # pred_probs = torch.log(torch.clamp(pred_probs, min=1e-8))
         # target_probs = heatmaps / (heatmaps.sum() + 1e-8)
         # target_probs = torch.clamp(target_probs, min=1e-8)
         # target_probs = target_probs / target_probs.sum()
-        kl_loss = kl_loss_fn(input=pred_probs, target=heatmaps)
-        probs = torch.sigmoid(outputs)
-        loss = kl_loss
+        # kl_loss = kl_loss_fn(input=pred_probs, target=target_probs)
+        loss = dice_loss(outputs,heatmaps)
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
-        dice = dice_coefficient_thresholded(probs,heatmaps)
+        dice = dice_coefficient(outputs,heatmaps)
         train_metric += dice
     train_loss /= len(train_dataloader)
     train_loss_history.append(train_loss)
