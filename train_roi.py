@@ -59,15 +59,17 @@ for epoch in range(Config.NUM_EPOCHS):
         outputs = torch.sigmoid(outputs)
         probs = torch.sigmoid(outputs)
         probs = probs.clamp(min=1e-8, max=1.0 - 1e-8)
-        dice_loss = dice_loss_fn(probs, heatmaps)
-
+        threshold = 0.5
+        pred_bin = (probs >= threshold).float()
+        heatmaps_bin = (heatmaps >= threshold).float()
+        dice_loss = dice_loss_fn(pred_bin, pred_bin)
         loss = kl_loss + dice_loss
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
-        dice = dice_metric(y_pred=probs, y=heatmaps)
+        dice = dice_metric(y_pred=pred_bin, y=heatmaps_bin)
         if dice.ndim > 0:
             dice = dice.mean()
         train_metric += dice.item()
