@@ -57,7 +57,7 @@ for epoch in range(Config.NUM_EPOCHS):
         # target_probs = torch.clamp(target_probs, min=1e-8)
         # target_probs = target_probs / target_probs.sum()
         kl_loss = kl_loss_fn(input=pred_probs, target=heatmaps)
-        probs = torch.softmax(outputs, dim=1)
+        probs = torch.sigmoid(outputs)
         loss = kl_loss
         # Backpropagation
         optimizer.zero_grad()
