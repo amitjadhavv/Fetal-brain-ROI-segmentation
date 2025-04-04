@@ -11,7 +11,10 @@ import  json
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import time
 import torch.nn.functional as F
+import warnings
 
+# This ignores *all* warnings of any category
+warnings.simplefilter('ignore')
 # Define augmentations using torchio
 transform = tio.Compose([
     tio.RandomFlip(axes=(0, 1, 2)),          # Randomly flip along axes
