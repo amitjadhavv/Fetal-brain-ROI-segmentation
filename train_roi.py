@@ -32,8 +32,8 @@ if torch.cuda.device_count()>1:
     model = DataParallel(model)
 model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
-dice_loss_fn = DiceLoss(include_background=True, squared_pred=True, reduction="mean")
-dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
+dice_loss_fn = DiceLoss(include_background=False, squared_pred=True, reduction="mean")
+dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
 kl_loss_fn = torch.nn.KLDivLoss(reduction="batchmean")
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
 scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
@@ -62,7 +62,10 @@ for epoch in range(Config.NUM_EPOCHS):
         threshold = 0.1
         pred_bin = (probs >= threshold).float()
         heatmaps_bin = (heatmaps >= threshold).float()
+        print("pred_bin unique:", torch.unique(pred_bin))
+        print("heatmaps_bin unique:", torch.unique(heatmaps_bin))
         dice_loss = dice_loss_fn(pred_bin, pred_bin)
+        print("diceloss: ",dice_loss)
         loss = kl_loss + dice_loss
         # Backpropagation
         optimizer.zero_grad()
