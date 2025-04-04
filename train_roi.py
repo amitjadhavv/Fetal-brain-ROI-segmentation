@@ -10,6 +10,7 @@ from monai.metrics import DiceMetric
 import  json
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import time
+import torch.nn.functional as F
 
 # Define augmentations using torchio
 transform = tio.Compose([
@@ -28,9 +29,9 @@ if torch.cuda.device_count()>1:
     model = DataParallel(model)
 model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
-dice_loss_fn = DiceLoss(include_background=True, softmax=False, squared_pred=True, reduction="mean")
+dice_loss_fn = DiceLoss(include_background=True, squared_pred=True, reduction="mean")
 dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
-kl_loss_fn = torch.nn.KLDivLoss(reduction="mean")
+kl_loss_fn = torch.nn.KLDivLoss(reduction="batchmean")
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
 scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
 train_loss_history = []
@@ -43,34 +44,26 @@ for epoch in range(Config.NUM_EPOCHS):
     for images, heatmaps in train_dataloader:
         images, heatmaps = images.to(Config.DEVICE), heatmaps.to(Config.DEVICE)
         outputs = model(images)
-        # Ensure heatmap and outputs have the same shape
-        background = 1 - torch.sum(heatmaps, dim=1, keepdim=True)
-        background = torch.clamp(background, min=0) # Compute background class
-        heatmaps = torch.cat([background, heatmaps], dim=1)
-        heatmaps = heatmaps + 1e-12
-        heatmap_sum = heatmaps.sum(dim=1, keepdim=True)
-        heatmaps = heatmaps / heatmap_sum
-        if torch.isnan(outputs).any() or torch.isinf(outputs).any():
-            print("⚠️ NaN or Inf detected in outputs!")
-
-        if torch.isnan(heatmaps).any() or torch.isinf(heatmaps).any():
-            print("⚠️ NaN or Inf detected in heatmaps!")
-
+        pred_map = F.relu(outputs)
+        map_sum = pred_map.sum(dim=1, keepdim=True) + 1e-8
+        pred_probs = pred_map / map_sum
         # Forward pass
-        dice_loss = dice_loss_fn(outputs, heatmaps)
-        log_outputs = torch.log(torch.clamp(outputs, min=1e-12))
-        kl_loss = kl_loss_fn(input=log_outputs, target=heatmaps)
-        #print(f"KL Loss: {kl_loss.item()}, ")
-        # print(f"Output min/max: {outputs.min().item()} / {outputs.max().item()}")
-        # print(f"Heatmap min/max: {heatmaps.min().item()} / {heatmaps.max().item()}")
-        # print(f"Sum of heatmaps (should be close to 1): {heatmaps.sum(dim=1).min().item()} - {heatmaps.sum(dim=1).max().item()}")
+        pred_probs = torch.log(torch.clamp(pred_probs, min=1e-8))
+        # target_probs = heatmaps / (heatmaps.sum() + 1e-8)
+        # target_probs = torch.clamp(target_probs, min=1e-8)
+        # target_probs = target_probs / target_probs.sum()
+        kl_loss = kl_loss_fn(input=pred_probs, target=heatmaps)
+        outputs = torch.sigmoid(outputs)
+        probs = torch.sigmoid(outputs)
+        dice_loss = dice_loss_fn(probs, heatmaps)
+
         loss = kl_loss + dice_loss
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
-        dice = dice_metric(y_pred=outputs, y=heatmaps)
+        dice = dice_metric(y_pred=probs, y=heatmaps)
         if dice.ndim > 0:
             dice = dice.mean()
         train_metric += dice.item()
