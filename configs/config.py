@@ -12,7 +12,7 @@ class Config:
     @classmethod
     def get_mask_paths(cls):
         masks = sorted(os.listdir(os.path.join(cls.dir_path, "new_global_masks")))
-        return [os.path.join(cls.dir_path, "new_global_heatmaps", i) for i in masks]
+        return [os.path.join(cls.dir_path, "new_global_masks", i) for i in masks]
 
 # Hyperparameters
     BATCH_SIZE = 32
