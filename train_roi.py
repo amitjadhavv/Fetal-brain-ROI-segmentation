@@ -55,9 +55,9 @@ for epoch in range(Config.NUM_EPOCHS):
         kl_loss = kl_loss_fn(input=pred_probs, target=heatmaps)
         outputs = torch.sigmoid(outputs)
         probs = torch.sigmoid(outputs)
-        dice_loss = dice_loss_fn(probs, heatmaps)
+        #dice_loss = dice_loss_fn(probs, heatmaps)
 
-        loss = kl_loss + dice_loss
+        loss = kl_loss #+ dice_loss
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
