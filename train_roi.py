@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from torch.nn.parallel import DataParallel
 from torch.utils.data import DataLoader
 from Datasets.dataset import MRIDataset
@@ -24,7 +25,7 @@ transform = tio.Compose([
 ])
 image_paths = Config.get_image_paths()
 mask_paths = Config.get_mask_paths()
-train_dataset = MRIDataset(image_paths, mask_paths, split="train", transform=transform, augmentation_factor=4)
+train_dataset = MRIDataset(image_paths, mask_paths, split="train", transform=transform, augmentation_factor=None)
 train_dataloader = DataLoader(train_dataset, batch_size=Config.BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=True, prefetch_factor=2, persistent_workers=True)
 print(len(train_dataloader))
 
@@ -36,6 +37,8 @@ optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight
 # dice_loss_fn = dice_loss(include_background=True, squared_pred=True, reduction="mean")
 # dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
 # kl_loss_fn = torch.nn.KLDivLoss(reduction="batchmean")
+bce_loss_fn = nn.BCEWithLogitsLoss()
+
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
 scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
 train_loss_history = []
@@ -57,7 +60,9 @@ for epoch in range(Config.NUM_EPOCHS):
         # target_probs = torch.clamp(target_probs, min=1e-8)
         # target_probs = target_probs / target_probs.sum()
         # kl_loss = kl_loss_fn(input=pred_probs, target=target_probs)
-        loss = dice_loss(outputs,heatmaps)
+        # loss = dice_loss(outputs,heatmaps)
+        loss = bce_loss_fn(outputs, heatmaps)
+
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
