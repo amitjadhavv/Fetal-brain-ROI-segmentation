@@ -68,11 +68,11 @@ for epoch in range(Config.NUM_EPOCHS):
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
-        dice = 1- dice_loss(outputs,heatmaps)
+        dice = 1 - dice_loss(outputs,heatmaps)
         train_metric += dice
     train_loss /= len(train_dataloader)
     train_loss_history.append(train_loss)
-    # train_metric /= len(train_dataloader)
+    train_metric /= len(train_dataloader)
     end_time = time.time()  # End time tracking
     epoch_time = end_time - start_time
     current_lr = scheduler.get_last_lr()[0]
