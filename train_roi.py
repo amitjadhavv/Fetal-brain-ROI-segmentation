@@ -25,7 +25,7 @@ transform = tio.Compose([
 ])
 image_paths = Config.get_image_paths()
 mask_paths = Config.get_mask_paths()
-train_dataset = MRIDataset(image_paths, mask_paths, split="train", transform=transform, augmentation_factor=None)
+train_dataset = MRIDataset(image_paths, mask_paths, split="train", transform=None, augmentation_factor=1)
 train_dataloader = DataLoader(train_dataset, batch_size=Config.BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=True, prefetch_factor=2, persistent_workers=True)
 print(len(train_dataloader))
 
