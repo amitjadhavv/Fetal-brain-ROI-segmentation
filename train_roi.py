@@ -68,15 +68,15 @@ for epoch in range(Config.NUM_EPOCHS):
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
-        # dice = dice_coefficient(outputs,heatmaps)
-        # train_metric += dice
+        dice = 1- dice_loss(outputs,heatmaps)
+        train_metric += dice
     train_loss /= len(train_dataloader)
     train_loss_history.append(train_loss)
     # train_metric /= len(train_dataloader)
     end_time = time.time()  # End time tracking
     epoch_time = end_time - start_time
     current_lr = scheduler.get_last_lr()[0]
-    print(f"Epoch {epoch+1}/{Config.NUM_EPOCHS}, Train Loss: {train_loss:.4f}, Time: {epoch_time:.2f} seconds, Epoch {epoch+1} , Current LR: {current_lr}")
+    print(f"Epoch {epoch+1}/{Config.NUM_EPOCHS}, Train Loss: {train_loss:.4f}, Dice metric Time:{train_metric:.4f}, {epoch_time:.2f} seconds, Epoch {epoch+1} , Current LR: {current_lr}")
     scheduler.step()
 model_save_path = "V_net_model_roi.pth"
 torch.save(model.state_dict(), model_save_path)
