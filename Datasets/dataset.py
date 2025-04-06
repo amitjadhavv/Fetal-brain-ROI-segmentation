@@ -7,21 +7,43 @@ import torch.nn.functional as F
 import torchio as tio
 from torch.utils.data import DataLoader
 
+def robust_normalize(img, lower_percentile=1, upper_percentile=99):
+    """
+    Apply robust clipping using the given percentiles, then min-max normalize to [0, 1].
+    """
+    # 1) Robust Clipping
+    low_val = np.percentile(img, lower_percentile)
+    high_val = np.percentile(img, upper_percentile)
+    clipped = np.clip(img, low_val, high_val)
+
+    # 2) Min-Max Normalization
+    normalized = (clipped - low_val) / (high_val - low_val)
+    return normalized
 
 class MRIDataset(Dataset):
     def __init__(self, image_paths, mask_paths, split="train", train_ratio=0.1, val_ratio=0.0,
-                 seed=123, transform=None, augmentation_factor=1):
+                 seed=123, transform=None, augmentation_factor=1,
+                 lower_percentile=1, upper_percentile=99):
         """
         Args:
             image_paths (list): List of paths to MRI images.
             mask_paths (list): List of paths to segmentation masks.
-            transform (callable, optional): Optional transform to apply on images and masks.
+            split (str): 'train', 'val', or 'test'.
+            train_ratio (float): Proportion of data for training.
+            val_ratio (float): Proportion of data for validation.
+            seed (int): Random seed for shuffling.
+            transform (callable, optional): Optional transform for data augmentation.
+            augmentation_factor (int): Factor by which to artificially expand dataset.
+            lower_percentile (float): Lower percentile for robust clipping (default=1).
+            upper_percentile (float): Upper percentile for robust clipping (default=99).
         """
         self.image_paths = image_paths
         self.mask_paths = mask_paths
         self.split = split
         self.transform = transform
         self.augmentation_factor = augmentation_factor
+        self.lower_percentile = lower_percentile
+        self.upper_percentile = upper_percentile
 
         # Shuffle data with seed
         data = list(zip(image_paths, mask_paths))
@@ -49,31 +71,38 @@ class MRIDataset(Dataset):
             raise ValueError("Invalid split! Choose from 'train', 'val', or 'test'.")
 
     def __len__(self):
-        return len(self.indices)* self.augmentation_factor
+        # Multiply by augmentation_factor so each sample is repeated
+        return len(self.indices) * self.augmentation_factor
 
     def __getitem__(self, idx):
-        # Load the MRI image and mask
-        actual_idx = self.indices[idx//self.augmentation_factor]
-        img = nib.load(self.image_paths[actual_idx]).get_fdata()
-        mask = nib.load(self.mask_paths[actual_idx]).get_fdata()
-        print(self.image_paths[actual_idx])
-        # Normalize the image
-        img = (img - np.min(img)) / (np.max(img) - np.min(img))
+        # Map the index to the correct file index
+        actual_idx = self.indices[idx // self.augmentation_factor]
+        image_path = self.image_paths[actual_idx]
+        mask_path = self.mask_paths[actual_idx]
 
-        # Add channel dimension to both image and mask
-        img = np.expand_dims(img, axis=0)
-        mask = np.expand_dims(mask, axis=0)
+        print(image_path)  # For debugging / logging
+
+        # Load the MRI image and mask
+        img_npy = nib.load(image_path).get_fdata()
+        mask_npy = nib.load(mask_path).get_fdata()
+
+        # Preprocess the image using the separate robust_normalize function
+        img_npy = robust_normalize(img_npy, self.lower_percentile, self.upper_percentile)
+
+        # Expand channel dimension
+        img_npy = np.expand_dims(img_npy, axis=0)  # shape: (1, D, H, W)
+        mask_npy = np.expand_dims(mask_npy, axis=0)
 
         # Convert to torch tensors
-        img = torch.tensor(img, dtype=torch.float32)
-        mask = torch.tensor(mask, dtype=torch.long)  # Use long for segmentation labels
+        img = torch.tensor(img_npy, dtype=torch.float32)
+        mask = torch.tensor(mask_npy, dtype=torch.long)
 
-        # Resize to 64x64x64
+        # Resize both to 64x64x64
         target_size = (64, 64, 64)
         img = F.interpolate(img.unsqueeze(0), size=target_size, mode='trilinear', align_corners=False).squeeze(0)
         mask = F.interpolate(mask.unsqueeze(0).float(), size=target_size, mode='nearest').squeeze(0)
 
-        # Apply transformations (if any)
+        # Apply TorchIO transforms (if any)
         if self.transform:
             subject = tio.Subject(
                 image=tio.ScalarImage(tensor=img),
@@ -81,6 +110,6 @@ class MRIDataset(Dataset):
             )
             subject = self.transform(subject)
             img = subject['image'].data
-            mask = subject['mask'].data  # Add channel dimension back
+            mask = subject['mask'].data
 
         return img, mask
