@@ -41,6 +41,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
 scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
 train_loss_history = []
+max_train_metric  = 0
 # # Training loop
 for epoch in range(Config.NUM_EPOCHS):
     model.train()
@@ -69,9 +70,11 @@ for epoch in range(Config.NUM_EPOCHS):
     print(
         f"Epoch {epoch + 1}/{Config.NUM_EPOCHS}, Train Loss: {train_loss:.4f}, IoU Score: {train_metric:.4f}, {epoch_time:.2f} seconds, Epoch {epoch + 1} , Current LR: {current_lr}")
     scheduler.step()
-model_save_path = "V_net_model_roi.pth"
-torch.save(model.state_dict(), model_save_path)
-print(f"Model state dictionary saved to {model_save_path}")
+    if epoch >900:
+        if train_metric > max_train_metric:
+            max_train_metric = train_metric
+            torch.save(model.state_dict(), "V_net_model_roi_best.pth")
+            print(f"Model state dictionary saved to V_net_model_roi_best.pth at Epoch: {epoch + 1} with IoU Score: {train_metric:.4f}")
 loss_history = {
     "train_loss": train_loss_history
 }
