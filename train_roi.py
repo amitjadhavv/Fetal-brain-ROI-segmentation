@@ -72,7 +72,7 @@ for epoch in range(Config.NUM_EPOCHS):
         optimizer.step()
         train_loss += loss.item()
 
-        iou = jaccard_index(outputs, heatmaps.int(), num_classes=Config.NUM_CLASSES)
+        iou = jaccard_index(outputs, heatmaps.int(),task="binary", num_classes=Config.NUM_CLASSES)
         train_metric += iou.item()
     train_loss /= len(train_dataloader)
     train_loss_history.append(train_loss)
