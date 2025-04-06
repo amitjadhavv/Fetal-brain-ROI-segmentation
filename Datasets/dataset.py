@@ -56,7 +56,7 @@ class MRIDataset(Dataset):
         actual_idx = self.indices[idx//self.augmentation_factor]
         img = nib.load(self.image_paths[actual_idx]).get_fdata()
         mask = nib.load(self.mask_paths[actual_idx]).get_fdata()
-
+        print(self.image_paths[actual_idx])
         # Normalize the image
         img = (img - np.min(img)) / (np.max(img) - np.min(img))
 

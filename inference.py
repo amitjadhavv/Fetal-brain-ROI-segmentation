@@ -90,9 +90,9 @@ def postprocess_mask(pred_mask, original_shape, inverse_mapping=None, threshold=
     resized_mask = resized_mask.squeeze(0).squeeze(0)
     final_mask = resized_mask.cpu().numpy().astype(np.int16)
     # Save binary mask with threshold
-    binary_mask = (resized_mask >= threshold).cpu().numpy().astype(np.uint8)
+    # binary_mask = (resized_mask >= threshold).cpu().numpy().astype(np.uint8)
 
-    return final_mask, binary_mask
+    return final_mask #binary_mask
 
 def save_nifti(volume, affine, save_path):
     """
@@ -131,26 +131,29 @@ def run_inference_single_image(image_path, model_path, output_path, mask_path):
     #   - Use argmax across the channels => predicted class for each voxel
     #   - For multi-label or binary, you might threshold each channel differently.
     # This example uses argmax for multi-class:
-    # pred_mask = torch.argmax(logits, dim=1)  # shape: (1, 64, 64, 64)
+    #pred_mask = torch.argmax(logits, dim=1)  # shape: (1, 64, 64, 64)
 
     # Post-process (resize + map labels back)
-    final_mask,binary_mask = postprocess_mask(
+    final_mask = postprocess_mask(
         logits[0],  # => shape: (64, 64, 64)
         original_shape
     )
 
+    # Print unique values of the final mask
+    print(f"Unique values in final mask: {np.unique(final_mask)}")
+
     # Save mask
     save_nifti(final_mask, affine, output_path)
     print(f"Saved segmentation mask to: {output_path}")
-    save_nifti(binary_mask, affine, mask_path)
-    print(f"Saved segmentation mask to: {mask_path}")
+    # save_nifti(binary_mask, affine, mask_path)
+    # print(f"Saved segmentation mask to: {mask_path}")
 
 
 if __name__ == "__main__":
     # Example usage:
     # Adjust these paths as needed
     sample_image_path = "/home/amit/PycharmProjects/fetalMRI2/MRI_data/new_images/"
-    image = "image_372.nii"
+    image = "image_335.nii"
     model_path = "V_net_model_roi.pth"
     # The path to your trained model
     output_mask_path = "/home/amit/PycharmProjects/fetalMRI2/MRI_data/output/"
