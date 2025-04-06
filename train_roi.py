@@ -28,7 +28,7 @@ transform = tio.Compose([
 ])
 image_paths = Config.get_image_paths()
 mask_paths = Config.get_mask_paths()
-train_dataset = MRIDataset(image_paths, mask_paths, split="train", transform=None, augmentation_factor=1)
+train_dataset = MRIDataset(image_paths, mask_paths, split="train", transform=None, augmentation_factor=4)
 train_dataloader = DataLoader(train_dataset, batch_size=Config.BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=True, prefetch_factor=2, persistent_workers=True)
 print(len(train_dataloader))
 
@@ -37,10 +37,6 @@ if torch.cuda.device_count()>1:
     model = DataParallel(model)
 model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
-# dice_loss_fn = dice_loss(include_background=True, squared_pred=True, reduction="mean")
-# dice_metric = DiceMetric(include_background=False, reduction="mean", get_not_nans=False)
-# kl_loss_fn = torch.nn.KLDivLoss(reduction="batchmean")
-# bce_loss_fn = nn.BCEWithLogitsLoss()
 
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
 scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
@@ -54,16 +50,6 @@ for epoch in range(Config.NUM_EPOCHS):
     for images, heatmaps in train_dataloader:
         images, heatmaps = images.to(Config.DEVICE), heatmaps.to(Config.DEVICE)
         outputs = model(images)
-        # pred_map = F.relu(outputs)
-        # map_sum = pred_map.sum(dim=1, keepdim=True) + 1e-8
-        # pred_probs = pred_map / map_sum
-        # Forward pass
-        # pred_probs = torch.log(torch.clamp(pred_probs, min=1e-8))
-        # target_probs = heatmaps / (heatmaps.sum() + 1e-8)
-        # target_probs = torch.clamp(target_probs, min=1e-8)
-        # target_probs = target_probs / target_probs.sum()
-        # kl_loss = kl_loss_fn(input=pred_probs, target=target_probs)
-        # loss = dice_loss(outputs,heatmaps)
         loss = dice_loss(outputs, heatmaps)
 
         # Backpropagation
