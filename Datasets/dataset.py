@@ -80,8 +80,6 @@ class MRIDataset(Dataset):
         image_path = self.image_paths[actual_idx]
         mask_path = self.mask_paths[actual_idx]
 
-        print(image_path)  # For debugging / logging
-
         # Load the MRI image and mask
         img_npy = nib.load(image_path).get_fdata()
         mask_npy = nib.load(mask_path).get_fdata()
