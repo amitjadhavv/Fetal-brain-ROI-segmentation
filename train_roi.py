@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn.parallel import DataParallel
 from torch.utils.data import DataLoader
 from Datasets.dataset import MRIDataset
-from models.VNet import VNet
+from models.LVNet import LVNet
 import torchio as tio
 from configs.config import Config
 # from monai.losses import DiceLoss
@@ -32,7 +32,7 @@ train_dataset = MRIDataset(image_paths, mask_paths, split="train", transform=Non
 train_dataloader = DataLoader(train_dataset, batch_size=Config.BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=True, prefetch_factor=2, persistent_workers=True)
 print(len(train_dataloader))
 
-model = VNet(num_classes=Config.NUM_CLASSES)
+model = LVNet(num_classes=Config.NUM_CLASSES)
 if torch.cuda.device_count()>1:
     model = DataParallel(model)
 model = model.to(Config.DEVICE)
