@@ -9,7 +9,7 @@ from configs.config import Config
 # from monai.losses import DiceLoss
 # from monai.metrics import DiceMetric
 import  json
-from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR
+from torch.optim.lr_scheduler import StepLR #CosineAnnealingLR
 import time
 import torch.nn.functional as F
 import warnings
@@ -39,8 +39,8 @@ model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
 
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
-scheduler1 = StepLR(optimizer, step_size=50, gamma=0.05)
-scheduler2 = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
+scheduler = StepLR(optimizer, step_size=50, gamma=0.5)
+# scheduler2 = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
 
 train_loss_history = []
 max_train_metric  = 0
@@ -68,15 +68,17 @@ for epoch in range(Config.NUM_EPOCHS):
     train_metric /= len(train_dataloader)
     end_time = time.time()  # End time tracking
     epoch_time = end_time - start_time
-    current_lr = scheduler1.get_last_lr()[0]
-    print(
-        f"Epoch {epoch + 1}/{Config.NUM_EPOCHS}, Train Loss: {train_loss:.4f}, IoU Score: {train_metric:.4f}, {epoch_time:.2f} seconds, Epoch {epoch + 1} , Current LR: {current_lr}")
-    scheduler1.step()
-    if epoch >900:
+    current_lr = scheduler.get_last_lr()[0]
+    scheduler.step()
+    print(f"Epoch {epoch + 1}/{Config.NUM_EPOCHS}, Train Loss: {train_loss:.4f}, IoU Score: {train_metric:.4f}, {epoch_time:.2f} seconds, Epoch {epoch + 1} , Current LR: {current_lr}")
+    if train_loss < 0.2:
         if train_metric > max_train_metric:
             max_train_metric = train_metric
             torch.save(model.state_dict(), "V_net_model_roi_best.pth")
             print(f"Model state dictionary saved to V_net_model_roi_best.pth at Epoch: {epoch + 1} with IoU Score: {train_metric:.4f}")
+    if train_loss < 0.1:
+        print("training stopped at epoch: ", epoch + 1)
+        break
 loss_history = {
     "train_loss": train_loss_history
 }
