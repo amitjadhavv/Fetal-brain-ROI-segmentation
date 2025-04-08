@@ -9,7 +9,7 @@ from configs.config import Config
 # from monai.losses import DiceLoss
 # from monai.metrics import DiceMetric
 import  json
-from torch.optim.lr_scheduler import StepLR #CosineAnnealingLR
+from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
 import time
 import torch.nn.functional as F
 import warnings
@@ -39,9 +39,9 @@ model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
 
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
-scheduler = StepLR(optimizer, step_size=50, gamma=0.5)
-# scheduler2 = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
-
+scheduler1 = StepLR(optimizer, step_size=1, gamma=0.5)
+scheduler2 = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
+scheduler = scheduler1
 train_loss_history = []
 max_train_metric  = 0
 # # Training loop
@@ -71,6 +71,8 @@ for epoch in range(Config.NUM_EPOCHS):
     current_lr = scheduler.get_last_lr()[0]
     scheduler.step()
     print(f"Epoch {epoch + 1}/{Config.NUM_EPOCHS}, Train Loss: {train_loss:.4f}, IoU Score: {train_metric:.4f}, {epoch_time:.2f} seconds, Epoch {epoch + 1} , Current LR: {current_lr}")
+    if epoch == 2:
+        scheduler = scheduler2
     if train_loss < 0.2:
         if train_metric > max_train_metric:
             max_train_metric = train_metric
