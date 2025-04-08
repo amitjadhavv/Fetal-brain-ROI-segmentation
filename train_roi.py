@@ -76,7 +76,7 @@ for epoch in range(Config.NUM_EPOCHS):
     if train_metric > 0.8:
         if train_metric > max_train_metric:
             max_train_metric = train_metric
-            torch.save(model.state_dict(), "V_net_model_roi_best.pth")
+            torch.save(model.state_dict(), "LV_net_model_roi_best.pth")
             print(f"Model state dictionary saved to V_net_model_roi_best.pth at Epoch: {epoch + 1} with IoU Score: {train_metric:.4f}")
     if train_loss < 0.2:
         print("training stopped at epoch: ", epoch + 1)
@@ -84,5 +84,5 @@ for epoch in range(Config.NUM_EPOCHS):
 loss_history = {
     "train_loss": train_loss_history
 }
-with open("loss_history_roi.json", "w") as f:
+with open("loss_history_roi_lvnet.json", "w") as f:
     json.dump(loss_history, f)
