@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn.parallel import DataParallel
 from torch.utils.data import DataLoader
 from Datasets.dataset import MRIDataset
-from models.LVNet import LVNet
+from models.VNet import VNet
 import torchio as tio
 from configs.config import Config
 # from monai.losses import DiceLoss
@@ -32,12 +32,12 @@ train_dataset = MRIDataset(image_paths, mask_paths, split="train", transform=Non
 train_dataloader = DataLoader(train_dataset, batch_size=Config.BATCH_SIZE, shuffle=True, num_workers=8, pin_memory=True, prefetch_factor=2, persistent_workers=True)
 print(len(train_dataloader))
 
-model = LVNet(num_classes=Config.NUM_CLASSES)
+model = VNet(num_classes=Config.NUM_CLASSES)
 if torch.cuda.device_count()>1:
     model = DataParallel(model)
 model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
-optimizer2 = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
+optimizer2 = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
 scheduler1 = StepLR(optimizer, step_size=100, gamma=0.5)
 scheduler2 = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
@@ -76,7 +76,7 @@ for epoch in range(Config.NUM_EPOCHS):
     if train_metric > 0.8:
         if train_metric > max_train_metric:
             max_train_metric = train_metric
-            torch.save(model.state_dict(), "LV_net_model_roi_best.pth")
+            torch.save(model.state_dict(), "V_net_model_roi_best.pth")
             print(f"Model state dictionary saved to V_net_model_roi_best.pth at Epoch: {epoch + 1} with IoU Score: {train_metric:.4f}")
     if train_loss < 0.2:
         print("training stopped at epoch: ", epoch + 1)
@@ -84,5 +84,5 @@ for epoch in range(Config.NUM_EPOCHS):
 loss_history = {
     "train_loss": train_loss_history
 }
-with open("loss_history_roi_lvnet.json", "w") as f:
+with open("loss_history_roi.json", "w") as f:
     json.dump(loss_history, f)
