@@ -37,7 +37,6 @@ if torch.cuda.device_count()>1:
     model = DataParallel(model)
 model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
-optimizer2 = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
 scheduler1 = StepLR(optimizer, step_size=100, gamma=0.25)
 scheduler2 = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
@@ -46,7 +45,7 @@ dice_loss = DiceLoss(sigmoid=True, to_onehot_y=False)
 bce_loss = nn.BCEWithLogitsLoss()
 def combined_loss(pred, target):
     return 0.3 * bce_loss(pred, target) + 0.7 * dice_loss(pred, target)
-scheduler = scheduler1
+scheduler = scheduler2
 train_loss_history = []
 max_train_metric  = 0
 # # Training loop
@@ -65,7 +64,6 @@ for epoch in range(Config.NUM_EPOCHS):
         optimizer.step()
         train_loss += loss.item()
         outputs = (outputs > 0.5).int()
-        print("outputs values:", outputs.unique())
         iou = jaccard_index((outputs > 0.5), heatmaps.int(),task="binary", num_classes=Config.NUM_CLASSES)
         train_metric += iou.item()
     train_loss /= len(train_dataloader)
@@ -83,7 +81,7 @@ for epoch in range(Config.NUM_EPOCHS):
             max_train_metric = train_metric
             torch.save(model.state_dict(), "V_net_model_roi_best.pth")
             print(f"Model state dictionary saved to V_net_model_roi_best.pth at Epoch: {epoch + 1} with IoU Score: {train_metric:.4f}")
-    if train_loss < 0.2:
+    if train_loss < 0.1:
         print("training stopped at epoch: ", epoch + 1)
         break
 loss_history = {
