@@ -13,8 +13,7 @@ from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
 import time
 import torch.nn.functional as F
 import warnings
-from utils.metrics import dice_coefficient
-# from utils.loss import dice_loss
+from utils.loss import total_variation_loss_3d
 from torchmetrics.functional import jaccard_index
 
 
@@ -44,7 +43,7 @@ scheduler2 = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
 dice_loss = DiceLoss(sigmoid=True, to_onehot_y=False)
 bce_loss = nn.BCEWithLogitsLoss()
 def combined_loss(pred, target):
-    return 0.3 * bce_loss(pred, target) + 0.7 * dice_loss(pred, target)
+    return 0.2 * bce_loss(pred, target) + 0.7 * dice_loss(pred, target) + 0.1 * total_variation_loss_3d(F.sigmoid(pred))
 scheduler = scheduler2
 train_loss_history = []
 max_train_metric  = 0
@@ -74,8 +73,6 @@ for epoch in range(Config.NUM_EPOCHS):
     current_lr = scheduler.get_last_lr()[0]
     scheduler.step()
     print(f"Epoch {epoch + 1}/{Config.NUM_EPOCHS}, Train Loss: {train_loss:.4f}, IoU Score: {train_metric:.4f}, {epoch_time:.2f} seconds, Epoch {epoch + 1} , Current LR: {current_lr}")
-    # if epoch > 200:
-    #     scheduler = scheduler2
     if train_metric > 0.8:
         if train_metric > max_train_metric:
             max_train_metric = train_metric
