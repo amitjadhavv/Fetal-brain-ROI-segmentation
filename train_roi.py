@@ -16,7 +16,6 @@ import warnings
 from utils.loss import total_variation_loss_3d
 from torchmetrics.functional import jaccard_index
 
-
 # This ignores *all* warnings of any category
 warnings.simplefilter('ignore')
 # Define augmentations using torchio
@@ -73,14 +72,11 @@ for epoch in range(Config.NUM_EPOCHS):
     current_lr = scheduler.get_last_lr()[0]
     scheduler.step()
     print(f"Epoch {epoch + 1}/{Config.NUM_EPOCHS}, Train Loss: {train_loss:.4f}, IoU Score: {train_metric:.4f}, {epoch_time:.2f} seconds, Epoch {epoch + 1} , Current LR: {current_lr}")
-    if train_metric > 0.8:
+    if train_metric > 0.92:
         if train_metric > max_train_metric:
             max_train_metric = train_metric
             torch.save(model.state_dict(), "V_net_model_roi_best.pth")
             print(f"Model state dictionary saved to V_net_model_roi_best.pth at Epoch: {epoch + 1} with IoU Score: {train_metric:.4f}")
-    if train_loss < 0.1:
-        print("training stopped at epoch: ", epoch + 1)
-        break
 loss_history = {
     "train_loss": train_loss_history
 }
