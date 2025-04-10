@@ -17,11 +17,10 @@ class VNet(nn.Module):
         self.bottleneck_conv = self.conv_block(128, 256)
 
         # Small DNN to add in the bottleneck
-        self.dnn_latent = None  # will be set in first forward pass
         self.dnn = nn.Sequential(
-            nn.Linear(1, 256),  # dummy init, real shape set later
+            nn.Linear(16384, 512),
             nn.ReLU(),
-            nn.Linear(256, 1),  # dummy init
+            nn.Linear(512, 16384),
             nn.ReLU()
         )
 
@@ -61,18 +60,6 @@ class VNet(nn.Module):
         # Ensure the tensor matches the device
         device = bottleneck.device
         flat = flat.to(device)
-
-        # Initialize DNN lazily with proper input/output size
-        if self.dnn_latent is None:
-            input_dim = flat.size(1)
-            self.dnn = nn.Sequential(
-                nn.Linear(input_dim, 512),
-                nn.ReLU(),
-                nn.Linear(512, input_dim),
-                nn.ReLU()
-            )
-            self.dnn_latent = input_dim
-            self.dnn = self.dnn.to(device)  # Ensure DNN is on the same device
 
         flat = self.dnn(flat)  # Pass through DNN
         bottleneck = flat.view(B, C, D, H, W)  # Reshape back
