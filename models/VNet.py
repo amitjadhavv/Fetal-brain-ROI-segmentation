@@ -14,7 +14,16 @@ class VNet(nn.Module):
         self.encoder4 = self.conv_block(64, 128)
 
         # Bottleneck
-        self.bottleneck = self.conv_block(128, 256)
+        self.bottleneck_conv = self.conv_block(128, 256)
+
+        # Small DNN to add in the bottleneck
+        self.dnn_latent = None  # will be set in first forward pass
+        self.dnn = nn.Sequential(
+            nn.Linear(1, 256),  # dummy init, real shape set later
+            nn.ReLU(),
+            nn.Linear(256, 1),  # dummy init
+            nn.ReLU()
+        )
 
         # Decoder
         self.decoder4 = self.conv_block(256 + 128, 128)
@@ -43,13 +52,40 @@ class VNet(nn.Module):
         enc4 = self.encoder4(F.max_pool3d(enc3, kernel_size=2, stride=2))
 
         # Bottleneck
-        bottleneck = self.bottleneck(F.max_pool3d(enc4, kernel_size=2, stride=2))
+        bottleneck = self.bottleneck_conv(F.max_pool3d(enc4, kernel_size=2, stride=2))
+
+        # DNN injection
+        B, C, D, H, W = bottleneck.shape
+        flat = bottleneck.view(B, -1)  # Flatten
+
+        # Ensure the tensor matches the device
+        device = bottleneck.device
+        flat = flat.to(device)
+
+        # Initialize DNN lazily with proper input/output size
+        if self.dnn_latent is None:
+            input_dim = flat.size(1)
+            self.dnn = nn.Sequential(
+                nn.Linear(input_dim, 512),
+                nn.ReLU(),
+                nn.Linear(512, input_dim),
+                nn.ReLU()
+            )
+            self.dnn_latent = input_dim
+            self.dnn = self.dnn.to(device)  # Ensure DNN is on the same device
+
+        flat = self.dnn(flat)  # Pass through DNN
+        bottleneck = flat.view(B, C, D, H, W)  # Reshape back
 
         # Decoder
-        dec4 = self.decoder4(torch.cat([F.interpolate(bottleneck, scale_factor=2, mode="trilinear", align_corners=True), enc4], dim=1))
-        dec3 = self.decoder3(torch.cat([F.interpolate(dec4, scale_factor=2, mode="trilinear", align_corners=True), enc3], dim=1))
-        dec2 = self.decoder2(torch.cat([F.interpolate(dec3, scale_factor=2, mode="trilinear", align_corners=True), enc2], dim=1))
-        dec1 = self.decoder1(torch.cat([F.interpolate(dec2, scale_factor=2, mode="trilinear", align_corners=True), enc1], dim=1))
+        dec4 = self.decoder4(
+            torch.cat([F.interpolate(bottleneck, scale_factor=2, mode="trilinear", align_corners=True), enc4], dim=1))
+        dec3 = self.decoder3(
+            torch.cat([F.interpolate(dec4, scale_factor=2, mode="trilinear", align_corners=True), enc3], dim=1))
+        dec2 = self.decoder2(
+            torch.cat([F.interpolate(dec3, scale_factor=2, mode="trilinear", align_corners=True), enc2], dim=1))
+        dec1 = self.decoder1(
+            torch.cat([F.interpolate(dec2, scale_factor=2, mode="trilinear", align_corners=True), enc1], dim=1))
 
         output = self.final_conv(dec1)
-        return torch.sigmoid(output)
+        return output

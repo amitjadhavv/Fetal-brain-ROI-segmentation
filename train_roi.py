@@ -6,7 +6,7 @@ from Datasets.dataset import MRIDataset
 from models.VNet import VNet
 import torchio as tio
 from configs.config import Config
-# from monai.losses import DiceLoss
+from monai.losses import DiceLoss
 # from monai.metrics import DiceMetric
 import  json
 from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
@@ -14,7 +14,7 @@ import time
 import torch.nn.functional as F
 import warnings
 from utils.metrics import dice_coefficient
-from utils.loss import dice_loss
+# from utils.loss import dice_loss
 from torchmetrics.functional import jaccard_index
 
 
@@ -39,8 +39,13 @@ model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
 optimizer2 = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
-scheduler1 = StepLR(optimizer, step_size=100, gamma=0.5)
+scheduler1 = StepLR(optimizer, step_size=100, gamma=0.25)
 scheduler2 = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
+# Use sigmoid for binary logits, and keep to_onehot_y=False
+dice_loss = DiceLoss(sigmoid=True, to_onehot_y=False)
+bce_loss = nn.BCEWithLogitsLoss()
+def combined_loss(pred, target):
+    return 0.3 * bce_loss(pred, target) + 0.7 * dice_loss(pred, target)
 scheduler = scheduler1
 train_loss_history = []
 max_train_metric  = 0
@@ -53,15 +58,15 @@ for epoch in range(Config.NUM_EPOCHS):
     for images, heatmaps in train_dataloader:
         images, heatmaps = images.to(Config.DEVICE), heatmaps.to(Config.DEVICE)
         outputs = model(images)
-        loss = dice_loss(outputs, heatmaps)
-
+        loss = combined_loss(outputs, heatmaps)
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
-
-        iou = jaccard_index(outputs, heatmaps.int(),task="binary", num_classes=Config.NUM_CLASSES)
+        outputs = (outputs > 0.5).int()
+        print("outputs values:", outputs.unique())
+        iou = jaccard_index((outputs > 0.5), heatmaps.int(),task="binary", num_classes=Config.NUM_CLASSES)
         train_metric += iou.item()
     train_loss /= len(train_dataloader)
     train_loss_history.append(train_loss)
