@@ -2,7 +2,6 @@
 import os
 import nibabel as nib
 
-
 def read_original_images():
     """
     Read all original images from both the original_images folder and 
