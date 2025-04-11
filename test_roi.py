@@ -39,5 +39,5 @@ with torch.no_grad():
         dice = dice.mean()
         val_metric += dice.item()
     # Aggregate Dice scores
-
+val_metric /= len(test_dataloader)
 print(f"Mean Dice Coefficient: {val_metric:.4f}")
