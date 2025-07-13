@@ -112,5 +112,5 @@ for epoch in range(Config.NUM_EPOCHS):
 loss_history = {
     "train_loss": train_loss_history
 }
-with open("loss_history_roi.json", "w") as f:
+with open("AVloss_history_roi.json", "w") as f:
     json.dump(loss_history, f)
