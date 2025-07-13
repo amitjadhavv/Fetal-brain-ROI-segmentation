@@ -5,14 +5,14 @@ import nibabel as nib
 import numpy as np
 import torch
 import torch.nn.functional as F
-
 from models.VNet import VNet
 from configs.config import Config
-
+from monai.transforms import Activations, AsDiscrete
+from Datasets.dataset import robust_normalize
 # If your dataset had a class mapping like {0:0, 1:1, 3:2, 4:3, 6:4}
 # and you want to revert it in the output file, define the inverse mapping here:
 # For example, the inverse of {0:0, 1:1, 3:2, 4:3, 6:4} is {0:0, 1:1, 2:3, 3:4, 4:6}.
-
+import time
 
 def load_model(model_path, num_classes):
     """
@@ -40,13 +40,7 @@ def preprocess_image(image_path, target_size=(64, 64, 64)):
     # Load the image
     nib_img = nib.load(image_path)
     image_data = nib_img.get_fdata()
-
-    # Normalize to [0,1]
-    min_val, max_val = np.min(image_data), np.max(image_data)
-    if max_val - min_val > 1e-6:
-        image_data = (image_data - min_val) / (max_val - min_val)
-    else:
-        image_data = np.zeros_like(image_data, dtype=np.float32)
+    image_data = robust_normalize(image_data)
 
     # Add channel dimension => (1, D, H, W)
     image_data = np.expand_dims(image_data, axis=0)
@@ -74,6 +68,10 @@ def postprocess_mask(pred_mask, original_shape, inverse_mapping=None, threshold=
     - Saves a binary heatmap mask based on a threshold, if binary_mask_path is provided.
     - Returns numpy array with final segmentation.
     """
+    post_pred = Activations(sigmoid=True)
+    post_label = AsDiscrete(threshold=0.5)
+    pred_mask = post_pred(pred_mask)
+    pred_mask = post_label(pred_mask)
     # Ensure shape is (1, 1, D, H, W) for interpolation
     if len(pred_mask.shape) == 3:
         pred_mask = pred_mask.unsqueeze(0).unsqueeze(0)
@@ -102,7 +100,7 @@ def save_nifti(volume, affine, save_path):
     nib.save(nib_obj, save_path)
 
 
-def run_inference_single_image(image_path, model_path, output_path, mask_path):
+def run_inference_single_image(image_path, model_path, output_path):
     """
     End-to-end function to:
       1) load model,
@@ -122,31 +120,22 @@ def run_inference_single_image(image_path, model_path, output_path, mask_path):
     # Preprocess
     input_tensor = preprocess_image(image_path, target_size=(64, 64, 64))
     input_tensor = input_tensor.to(Config.DEVICE)
-
+    #print(input_tensor)
+ 
     # Forward pass
     with torch.no_grad():
         logits = model(input_tensor)  # shape: (1, num_classes, 64, 64, 64)
 
-    # If you are doing multi-class single-label:
-    #   - Use argmax across the channels => predicted class for each voxel
-    #   - For multi-label or binary, you might threshold each channel differently.
-    # This example uses argmax for multi-class:
-    #pred_mask = torch.argmax(logits, dim=1)  # shape: (1, 64, 64, 64)
-
     # Post-process (resize + map labels back)
     final_mask = postprocess_mask(
-        logits[0],  # => shape: (64, 64, 64)
+        logits,
         original_shape
     )
-
     # Print unique values of the final mask
-    print(f"Unique values in final mask: {np.unique(final_mask)}")
-
+    #print(f"Unique values in final mask: {np.unique(final_mask)}")
     # Save mask
-    save_nifti(final_mask, affine, output_path)
-    print(f"Saved segmentation mask to: {output_path}")
-    # save_nifti(binary_mask, affine, mask_path)
-    # print(f"Saved segmentation mask to: {mask_path}")
+    #save_nifti(final_mask, affine, output_path)
+    #print(f"Saved segmentation mask to: {output_path}")
 
 
 if __name__ == "__main__":
@@ -154,15 +143,18 @@ if __name__ == "__main__":
     # Adjust these paths as needed
     sample_image_path = "/home/amit/PycharmProjects/fetalMRI2/MRI_data/new_images/"
     image = "image_335.nii"
-    model_path = "V_net_model_roi.pth"
+    model_path = "V_net_model_roi_best.pth"
     # The path to your trained model
     output_mask_path = "/home/amit/PycharmProjects/fetalMRI2/MRI_data/output/"
     output = "predicted_"+image
-
+    start_time = time.time()
     # Make sure the model_path and sample_image_path exist
     if not os.path.exists(sample_image_path):
         raise FileNotFoundError(f"Sample image not found: {sample_image_path}")
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model checkpoint not found: {model_path}")
 
-    run_inference_single_image(sample_image_path+image, model_path,output_mask_path+"heatmap"+output,output_mask_path+"mask"+output  )
+    run_inference_single_image(sample_image_path+image, model_path,output_mask_path+output)
+    end_time = time.time()  # End time tracking
+    inference_time = end_time - start_time
+    print(str(inference_time) + " seconds")
