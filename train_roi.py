@@ -51,7 +51,7 @@ epochs_without_improvement = 0
 best_val_metric = 0
 train_loss_history = []
 val_loss_history = []
-best_model_path = "AV_net_model_roi_best.pth"
+best_model_path = "AV_net_noDNN_model_roi_best.pth"
 
 # # Training loop
 for epoch in range(Config.NUM_EPOCHS):
