@@ -40,12 +40,12 @@ class AttentionVNet(nn.Module):
         self.bottleneck = self.conv_block(128, 256)
 
         # Simple DNN at bottleneck
-        # self.dnn = nn.Sequential(
-        #     nn.Linear(16384, 512),
-        #     nn.ReLU(),
-        #     nn.Linear(512, 16384),
-        #     nn.ReLU()
-        # )
+        self.dnn = nn.Sequential(
+            nn.Linear(16384, 256),
+            nn.ReLU(),
+            nn.Linear(256, 16384),
+            nn.ReLU()
+        )
 
         self.att4 = AttentionBlock(256, 128, 128)
         self.att3 = AttentionBlock(128, 64, 64)
@@ -79,10 +79,10 @@ class AttentionVNet(nn.Module):
         bottleneck = self.bottleneck(F.max_pool3d(enc4, kernel_size=2, stride=2))
 
         # Apply DNN at bottleneck
-        # b_shape = bottleneck.shape  # (B, C, D, H, W)
-        # b_flat = bottleneck.view(b_shape[0], -1)
-        # b_flat = self.dnn(b_flat)
-        # bottleneck = b_flat.view(b_shape)
+        b_shape = bottleneck.shape  # (B, C, D, H, W)
+        b_flat = bottleneck.view(b_shape[0], -1)
+        b_flat = self.dnn(b_flat)
+        bottleneck = b_flat.view(b_shape)
 
         g4 = F.interpolate(bottleneck, scale_factor=2, mode="trilinear", align_corners=True)
         x4 = self.att4(g4, enc4)
