@@ -43,10 +43,12 @@ optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight
 
 scheduler = OneCycleLR(
     optimizer,
-    max_lr=7e-3,
+    max_lr=3e-3,
     steps_per_epoch=len(train_dataloader),
     epochs=Config.NUM_EPOCHS,
-    pct_start=0.1
+    pct_start=0.3,
+    div_factor = 50,
+    final_div_factor = 1000
 )
 
 # Use sigmoid for binary logits, and keep to_onehot_y=False
