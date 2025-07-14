@@ -9,7 +9,8 @@ from configs.config import Config
 from monai.losses import DiceLoss
 # from monai.metrics import DiceMetric
 import  json
-from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import OneCycleLR
 import time
 import torch.nn.functional as F
 import warnings
@@ -38,7 +39,16 @@ if torch.cuda.device_count()>1:
 model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
-scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
+# scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
+
+scheduler = OneCycleLR(
+    optimizer,
+    max_lr=7e-3,
+    steps_per_epoch=len(train_dataloader),
+    epochs=Config.NUM_EPOCHS,
+    pct_start=0.1
+)
+
 # Use sigmoid for binary logits, and keep to_onehot_y=False
 dice_loss = DiceLoss(sigmoid=True, to_onehot_y=False)
 bce_loss = nn.BCEWithLogitsLoss()
@@ -46,7 +56,7 @@ def combined_loss(pred, target):
     return 0.2 * bce_loss(pred, target) + 0.7 * dice_loss(pred, target) + 0.1 * total_variation_loss_3d(F.sigmoid(pred))
 
 # Early stopping setup
-early_stop_patience = 20
+early_stop_patience = 40
 epochs_without_improvement = 0
 best_val_metric = 0
 train_loss_history = []
