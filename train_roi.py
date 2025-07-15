@@ -39,7 +39,7 @@ if torch.cuda.device_count()>1:
 model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
-scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
+scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-8)
 
 # scheduler = OneCycleLR(
 #     optimizer,
