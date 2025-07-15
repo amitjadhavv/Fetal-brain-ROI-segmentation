@@ -10,7 +10,7 @@ from monai.losses import DiceLoss
 # from monai.metrics import DiceMetric
 import  json
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.optim.lr_scheduler import OneCycleLR
+# from torch.optim.lr_scheduler import OneCycleLR
 import time
 import torch.nn.functional as F
 import warnings
@@ -39,17 +39,17 @@ if torch.cuda.device_count()>1:
 model = model.to(Config.DEVICE)
 optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4)
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
-# scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-6)
+scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-7)
 
-scheduler = OneCycleLR(
-    optimizer,
-    max_lr=3e-3,
-    steps_per_epoch=len(train_dataloader),
-    epochs=Config.NUM_EPOCHS,
-    pct_start=0.3,
-    div_factor = 50,
-    final_div_factor = 1000
-)
+# scheduler = OneCycleLR(
+#     optimizer,
+#     max_lr=3e-3,
+#     steps_per_epoch=len(train_dataloader),
+#     epochs=Config.NUM_EPOCHS,
+#     pct_start=0.3,
+#     div_factor = 50,
+#     final_div_factor = 1000
+# )
 
 # Use sigmoid for binary logits, and keep to_onehot_y=False
 dice_loss = DiceLoss(sigmoid=True, to_onehot_y=False)
