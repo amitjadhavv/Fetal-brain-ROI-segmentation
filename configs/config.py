@@ -15,7 +15,7 @@ class Config:
         return [os.path.join(cls.dir_path, "new_global_masks", i) for i in masks]
 
 # Hyperparameters
-    BATCH_SIZE = 16
+    BATCH_SIZE = 1
     LEARNING_RATE = 1e-4
     NUM_CLASSES = 1
     NUM_EPOCHS = 500
