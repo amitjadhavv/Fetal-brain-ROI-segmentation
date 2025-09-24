@@ -15,21 +15,16 @@ venv/
 Thumbs.db
 
 #data
-MRI_data/
 
-# Ignore logs and temporary files
-*.log
+# Ignore logs and temporary file
 *.tmp
 *.swp
 *.slurm
-# Ignore data files
-*.nii  # For NIfTI MRI files
-*.csv
+# Ignore data files # For NIfTI MRI files
 *.json
 *.xlsx
 
 # Ignore model files and checkpoints
 *.h5
 *.ckpt
-*.pth
 *.onnx

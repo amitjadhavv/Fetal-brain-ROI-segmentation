@@ -5,20 +5,43 @@ import nibabel as nib
 import numpy as np
 import torch
 import torch.nn.functional as F
-from models.VNet import VNet
+from models.AttentionVNet import AttentionVNet
 from configs.config import Config
 from monai.transforms import Activations, AsDiscrete
 from Datasets.dataset import robust_normalize
-# If your dataset had a class mapping like {0:0, 1:1, 3:2, 4:3, 6:4}
-# and you want to revert it in the output file, define the inverse mapping here:
-# For example, the inverse of {0:0, 1:1, 3:2, 4:3, 6:4} is {0:0, 1:1, 2:3, 3:4, 4:6}.
 import time
+from scipy import ndimage
+
+def keep_largest_connected_component(mask):
+    """
+    Keep only the largest connected component from a binary 3D mask.
+    Handles both NumPy arrays and PyTorch tensors.
+    Returns a torch tensor (int).
+    """
+    # Convert to numpy
+    if isinstance(mask, torch.Tensor):
+        mask_np = mask.detach().cpu().numpy().astype(np.uint8)
+    else:
+        mask_np = mask.astype(np.uint8)
+
+    # Connected component labeling
+    labeled, num_features = ndimage.label(mask_np)
+    if num_features < 2:  # nothing to clean
+        cleaned = mask_np
+    else:
+        sizes = ndimage.sum(mask_np, labeled, range(1, num_features + 1))
+        largest_cc = (sizes.argmax() + 1)
+        cleaned = (labeled == largest_cc).astype(np.uint8)
+
+    # Back to torch tensor, shape [1,1,D,H,W]
+    cleaned_t = torch.tensor(cleaned, dtype=torch.int)
+    return cleaned_t
 
 def load_model(model_path, num_classes):
     """
     Loads the trained VNet model from a .pth checkpoint.
     """
-    model = VNet(num_classes=num_classes).to(Config.DEVICE)
+    model = AttentionVNet(num_classes=num_classes).to(Config.DEVICE)
 
     # Load state dict
     state_dict = torch.load(model_path, map_location=Config.DEVICE)
@@ -68,10 +91,13 @@ def postprocess_mask(pred_mask, original_shape, inverse_mapping=None, threshold=
     - Saves a binary heatmap mask based on a threshold, if binary_mask_path is provided.
     - Returns numpy array with final segmentation.
     """
+
     post_pred = Activations(sigmoid=True)
     post_label = AsDiscrete(threshold=0.5)
     pred_mask = post_pred(pred_mask)
     pred_mask = post_label(pred_mask)
+    pred_mask = keep_largest_connected_component(pred_mask.cpu().numpy()) #keep only 1 mask cluster and remove smaller clusters if there are any
+
     # Ensure shape is (1, 1, D, H, W) for interpolation
     if len(pred_mask.shape) == 3:
         pred_mask = pred_mask.unsqueeze(0).unsqueeze(0)
@@ -87,8 +113,6 @@ def postprocess_mask(pred_mask, original_shape, inverse_mapping=None, threshold=
     # Remove batch and channel dims => (D, H, W)
     resized_mask = resized_mask.squeeze(0).squeeze(0)
     final_mask = resized_mask.cpu().numpy().astype(np.int16)
-    # Save binary mask with threshold
-    # binary_mask = (resized_mask >= threshold).cpu().numpy().astype(np.uint8)
 
     return final_mask #binary_mask
 
@@ -131,22 +155,22 @@ def run_inference_single_image(image_path, model_path, output_path):
         logits,
         original_shape
     )
-    # Print unique values of the final mask
-    #print(f"Unique values in final mask: {np.unique(final_mask)}")
-    # Save mask
-    #save_nifti(final_mask, affine, output_path)
-    #print(f"Saved segmentation mask to: {output_path}")
+    #Print unique values of the final mask
+    print(f"Unique values in final mask: {np.unique(final_mask)}")
+    #Save mask
+    save_nifti(final_mask, affine, output_path)
+    print(f"Saved segmentation mask to: {output_path}")
 
 
 if __name__ == "__main__":
     # Example usage:
     # Adjust these paths as needed
-    sample_image_path = "/home/amit/PycharmProjects/fetalMRI2/MRI_data/new_images/"
-    image = "image_335.nii"
-    model_path = "V_net_model_roi_best.pth"
+    sample_image_path = "/home/amit/PycharmProjects/fetalMRI2/MRI_data/new_images/" #input folder lcoation
+    image = "image_335.nii" # input file name
+    model_path = "AV_net_noDNN_model_roi_best.pth" # model file name
     # The path to your trained model
-    output_mask_path = "/home/amit/PycharmProjects/fetalMRI2/MRI_data/output/"
-    output = "predicted_"+image
+    output_mask_path = "/home/amit/PycharmProjects/fetalMRI2/MRI_data/output/" # output directory to save the predicted mask
+    output = "predicted_"+image # output file name
     start_time = time.time()
     # Make sure the model_path and sample_image_path exist
     if not os.path.exists(sample_image_path):
@@ -157,4 +181,4 @@ if __name__ == "__main__":
     run_inference_single_image(sample_image_path+image, model_path,output_mask_path+output)
     end_time = time.time()  # End time tracking
     inference_time = end_time - start_time
-    print(str(inference_time) + " seconds")
+    print(str(inference_time) + " seconds") # prints the time taken to process the file.

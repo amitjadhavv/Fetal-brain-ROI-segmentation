@@ -7,17 +7,14 @@ from models.AttentionVNet import AttentionVNet
 import torchio as tio
 from configs.config import Config
 from monai.losses import DiceLoss
-# from monai.metrics import DiceMetric
-import  json
+from monai.transforms import Activations, AsDiscrete
 from torch.optim.lr_scheduler import CosineAnnealingLR
-# from torch.optim.lr_scheduler import OneCycleLR
 import time
 import torch.nn.functional as F
 import warnings
 from utils.loss import total_variation_loss_3d
 from torchmetrics.functional import jaccard_index
 
-# This ignores *all* warnings of any category
 warnings.simplefilter('ignore')
 # Define augmentations using torchio
 transform = tio.Compose([
@@ -41,28 +38,17 @@ optimizer = torch.optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight
 # Learning Rate Scheduler (Cosine Annealing for smooth decay)
 scheduler = CosineAnnealingLR(optimizer, T_max=Config.NUM_EPOCHS, eta_min=1e-8)
 
-# scheduler = OneCycleLR(
-#     optimizer,
-#     max_lr=3e-3,
-#     steps_per_epoch=len(train_dataloader),
-#     epochs=Config.NUM_EPOCHS,
-#     pct_start=0.3,
-#     div_factor = 50,
-#     final_div_factor = 1000
-# )
-
-# Use sigmoid for binary logits, and keep to_onehot_y=False
 dice_loss = DiceLoss(sigmoid=True, to_onehot_y=False)
 bce_loss = nn.BCEWithLogitsLoss()
 def combined_loss(pred, target):
     return 0.2 * bce_loss(pred, target) + 0.7 * dice_loss(pred, target) + 0.1 * total_variation_loss_3d(F.sigmoid(pred))
-
+#post_processing for Validation set
+post_pred = Activations(sigmoid=True)
+post_label = AsDiscrete(threshold=0.5)
 # Early stopping setup
 early_stop_patience = 40
 epochs_without_improvement = 0
 best_val_metric = 0
-train_loss_history = []
-val_loss_history = []
 best_model_path = "AV_net_noDNN_model_roi_best.pth"
 
 # # Training loop
@@ -80,11 +66,11 @@ for epoch in range(Config.NUM_EPOCHS):
         loss.backward()
         optimizer.step()
         train_loss += loss.item()
-        outputs = (outputs > 0.5).int()
-        iou = jaccard_index((outputs > 0.5), heatmaps.int(),task="binary", num_classes=Config.NUM_CLASSES)
+        preds = post_pred(outputs)
+        preds = post_label(preds)
+        iou = jaccard_index(preds, heatmaps.int(),task="binary", num_classes=Config.NUM_CLASSES)
         train_metric += iou.item()
     train_loss /= len(train_dataloader)
-    train_loss_history.append(train_loss)
     train_metric /= len(train_dataloader)
 
     # Validation
@@ -97,13 +83,13 @@ for epoch in range(Config.NUM_EPOCHS):
             outputs = model(images)
             loss = combined_loss(outputs, heatmaps)
             val_loss += loss.item()
-            preds = (outputs > 0.5).int()
+            preds = post_pred(outputs)
+            preds = post_label(preds)
             iou = jaccard_index(preds, heatmaps.int(), task="binary", num_classes=Config.NUM_CLASSES)
             val_metric += iou.item()
 
     val_loss /= len(val_loader)
     val_metric /= len(val_loader)
-    val_loss_history.append(val_loss)
     end_time = time.time()  # End time tracking
     epoch_time = end_time - start_time
     current_lr = scheduler.get_last_lr()[0]
@@ -121,8 +107,4 @@ for epoch in range(Config.NUM_EPOCHS):
     if epochs_without_improvement >= early_stop_patience:
         print(f" Early stopping triggered at epoch {epoch + 1}. Best Val IoU: {best_val_metric:.4f}")
         break
-loss_history = {
-    "train_loss": train_loss_history
-}
-with open("AVloss_history_roi.json", "w") as f:
-    json.dump(loss_history, f)
+

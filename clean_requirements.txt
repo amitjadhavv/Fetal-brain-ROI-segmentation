@@ -1,0 +1,10 @@
+Package      Version
+------------ ------------
+matplotlib   3.10.0
+monai        1.4.0
+pip          25.0.1
+torchaudio   2.5.1+cu118
+torchinfo    1.8.0
+torchio      0.20.1
+torchmetrics 1.7.0
+torchvision  0.20.1+cu118

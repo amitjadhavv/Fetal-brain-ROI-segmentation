@@ -160,29 +160,15 @@ def main(train_images_dir, train_labels_dir, out_heatmaps_dir, out_binary_dir,
         print(f"Processed {img_name} → {heatmap_path} and {binary_path}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate elliptical Gaussian heatmaps and binary masks.")
-    parser.add_argument("--train_images_dir", type=str, required=True,
-                        help="Path to folder containing training images (NIfTI files).")
-    parser.add_argument("--train_labels_dir", type=str, required=True,
-                        help="Path to folder containing training labels (NIfTI files).")
-    parser.add_argument("--out_heatmaps_dir", type=str, default="ellipsoidal_heatmaps",
-                        help="Output folder where Gaussian heatmaps are saved.")
-    parser.add_argument("--out_binary_dir", type=str, default="ellipsoidal_binary_masks",
-                        help="Output folder where binary masks are saved.")
-    parser.add_argument("--alpha", type=float, default=1.0,
-                        help="Global scaling factor for the standard deviation of each axis.")
-    parser.add_argument("--min_sigma", type=float, default=1.0,
-                        help="Minimum sigma allowed for each axis.")
-    parser.add_argument("--threshold", type=float, default=0.1,
-                        help="Threshold for binary mask generation.")
+    # ✅ Default: Original MRI input folders
+    train_images_dir = "MRI_data/new_images"  # Original images
+    train_labels_dir = "MRI_data/new_labels"  # Original labels
 
-    args = parser.parse_args()
-    main(
-        train_images_dir=args.train_images_dir,
-        train_labels_dir=args.train_labels_dir,
-        out_heatmaps_dir=args.out_heatmaps_dir,
-        out_binary_dir=args.out_binary_dir,
-        alpha=args.alpha,
-        min_sigma=args.min_sigma,
-        threshold=args.threshold
-    )
+    # ✅ Default: Generated folders for outputs
+    out_heatmaps_dir = "MRI_data/new_global_heatmaps"  # Created folder for Gaussian heatmaps
+    out_binary_dir = "MRI_data/new_global_masks"  # Created folder for binary masks
+
+    # Hyperparameters
+    alpha = 1.0  # Global scaling factor for std dev
+    min_sigma = 1.0  # Minimum sigma allowed
+    threshold = 0.1  # Threshold for binary mask generation
