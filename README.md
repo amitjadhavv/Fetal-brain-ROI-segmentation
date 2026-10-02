@@ -1,93 +1,181 @@
-# fetal_MRI
+# Fetal Brain ROI Segmentation
 
+3D region-of-interest (ROI) segmentation of the fetal brain in MRI volumes using an **Attention V-Net** built in PyTorch. The model predicts a coarse binary ROI mask around the fetal brain from a low-resolution (64×64×64) copy of the volume. The mask can then be resized back to the original image space, e.g. to crop the brain for downstream processing.
 
+## Overview
 
-## Getting started
+| Item | Details |
+| --- | --- |
+| Task | Binary 3D segmentation of a fetal-brain ROI |
+| Input | Fetal MRI volume (NIfTI, `.nii` / `.nii.gz`), resized to 64×64×64 |
+| Output | Binary ROI mask in the original image shape and affine (NIfTI) |
+| Model | Attention V-Net (3D U-Net-style encoder/decoder with attention gates) |
+| Loss | 0.2 · BCE + 0.7 · Dice + 0.1 · 3D total variation |
+| Metrics | Dice and IoU (Jaccard) |
+| Best validation IoU | 0.9306 (epoch 398, early stopping at epoch 438) |
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+### How the ROI targets are made
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+The dataset provides fetal-brain label masks, not ROI masks. [Binary_combined_gaussian.py](Binary_combined_gaussian.py) turns each label into a smooth ROI target:
 
-## Add your files
+1. Compute the center of mass of the label.
+2. Compute a per-axis standard deviation of the label voxels, scaled by `alpha`, with a floor of `min_sigma`.
+3. Build an ellipsoidal 3D Gaussian heatmap from the center and sigmas.
+4. Threshold the heatmap (default `0.1`) to get a binary ellipsoidal mask. These masks are the training targets.
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+## Repository structure
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/AmitJadhavv/fetal_mri.git
-git branch -M main
-git push -uf origin main
+.
+├── configs/config.py                # Paths, batch size, LR, epochs, device
+├── Datasets/dataset.py              # MRIDataset: normalization, resize, split, augmentation
+├── models/
+│   ├── AttentionVNet.py             # Attention V-Net (used for training/inference)
+│   └── VNet.py                      # Plain V-Net baseline
+├── utils/
+│   ├── loss.py                      # 3D total variation loss
+│   └── support.py                   # EarlyStopping helper
+├── data_prepration_validation.py    # Pairs images with labels, drops shape mismatches
+├── Binary_combined_gaussian.py      # Label -> Gaussian heatmap -> binary ROI mask
+├── train_roi.py                     # Training loop
+├── final_results_val_test.py        # Dice / IoU on the val and test splits
+├── inference.py                     # Single-volume inference
+├── lossgraph.py                     # Plots loss/IoU curves from the training log
+├── summary.py, check.py             # Model summaries (torchinfo / torchsummary)
+├── AV_net_noDNN_model_roi_best.pth  # Trained checkpoint (best validation IoU)
+├── run_avnet_noDNN_1122983.log      # Training log (HPC run, A100 40GB)
+├── loss_curves.png, iou_curves.png  # Training curves
+└── MRI_data/                        # Data (see "Data layout")
 ```
-
-## Integrate with your tools
-
-- [ ] [Set up project integrations](https://gitlab.com/AmitJadhavv/fetal_mri/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
 
 ## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+
+Requires Python 3 and, for reasonable training speed, a CUDA GPU. The checkpoint was trained with PyTorch 2.5.1 (CUDA 11.8).
+
+```bash
+python -m venv venv
+# Windows: venv\Scripts\activate    Linux/macOS: source venv/bin/activate
+
+# PyTorch with CUDA 11.8 (adjust to your CUDA version)
+pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu118
+
+# Remaining dependencies
+pip install monai==1.4.0 torchio==0.20.1 torchmetrics==1.7.0 torchinfo==1.8.0 \
+            nibabel==5.3.2 numpy==1.26.3 scipy==1.14.1 matplotlib==3.10.0 torchsummary==1.5.1
+```
+
+[requirements.txt](requirements.txt) is the full pinned environment (`pip freeze`); [clean_requirements.txt](clean_requirements.txt) lists only a few top-level packages and is incomplete.
+
+## Data layout
+
+Place data under `MRI_data/`:
+
+```
+MRI_data/
+├── original-images/        # Raw fetal MRI volumes (.nii / .nii.gz)
+├── original-labels/        # Matching label volumes (.nii.gz)
+├── new_images/             # Created by data_prepration_validation.py  (image_001.nii, ...)
+├── new_labels/             # Created by data_prepration_validation.py  (label_001.nii, ...)
+├── new_global_heatmaps/    # Created by Binary_combined_gaussian.py
+└── new_global_masks/       # Created by Binary_combined_gaussian.py (training targets)
+```
+
+Training reads `MRI_data/new_images` and `MRI_data/new_global_masks`, matched by sorted filename order. The data path is set in [configs/config.py](configs/config.py).
+
+The dataset is split with a fixed seed (`246`) into **80% train / 10% validation / 10% test**. Training volumes are repeated 4× per epoch (`augmentation_factor=4`).
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+### 1. Prepare the data
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```bash
+python data_prepration_validation.py
+```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+Matches raw images to labels by filename prefix, copies pairs with identical shapes to `new_images/` and `new_labels/`, and writes `size_mismatched_pairs.csv`.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+Then generate the ROI targets:
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+```bash
+python Binary_combined_gaussian.py
+```
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+> **Note:** the `__main__` block of this script only sets the folder paths and hyperparameters. It does not call `main(...)`. Add this line at the end of the block before running it:
+>
+> ```python
+> main(train_images_dir, train_labels_dir, out_heatmaps_dir, out_binary_dir, alpha, min_sigma, threshold)
+> ```
 
-## License
-For open source projects, say how it is licensed.
+### 2. Train
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+```bash
+python train_roi.py
+```
+
+Settings from [configs/config.py](configs/config.py) and [train_roi.py](train_roi.py):
+
+| Setting | Value |
+| --- | --- |
+| Batch size | 1 |
+| Optimizer | Adam, lr 1e-5, weight decay 1e-4 |
+| Scheduler | Cosine annealing (`eta_min=1e-8`) |
+| Max epochs | 500 |
+| Early stopping | patience of 40 epochs on validation IoU |
+| Checkpoint | Best validation IoU saved to `AV_net_noDNN_model_roi_best.pth` |
+
+If more than one GPU is available, the model is wrapped in `DataParallel`. Checkpoints with the `module.` prefix are handled when loading. The TorchIO augmentation pipeline (flips, affine, noise) is defined in `train_roi.py` but not passed to the dataset (`transform=None`).
+
+### 3. Evaluate
+
+```bash
+python final_results_val_test.py
+```
+
+Prints mean ± standard deviation of Dice and IoU for the validation and test splits using `AV_net_noDNN_model_roi_best.pth`.
+
+### 4. Run inference on one volume
+
+Edit the paths in the `__main__` block of [inference.py](inference.py) (`sample_image_path`, `image`, `model_path`, `output_mask_path`). They currently point to the author's machine. Then run:
+
+```bash
+python inference.py
+```
+
+Pipeline: percentile normalization → resize to 64³ → forward pass → sigmoid and 0.5 threshold → keep the largest connected component → nearest-neighbour resize to the original shape → save NIfTI with the original affine.
+
+To use it from Python:
+
+```python
+from inference import run_inference_single_image
+
+run_inference_single_image("MRI_data/new_images/image_335.nii",
+                           "AV_net_noDNN_model_roi_best.pth",
+                           "predicted_image_335.nii")
+```
+
+### 5. Plot training curves and inspect the model
+
+```bash
+python lossgraph.py   # parses run_avnet_noDNN_1122983.log -> loss_curves.png, iou_curves.png
+python summary.py     # torchinfo summary (plain VNet)
+python check.py       # torchsummary of AttentionVNet
+```
+
+## Model
+
+[models/AttentionVNet.py](models/AttentionVNet.py) is a 3D encoder–decoder with four downsampling stages (16 → 32 → 64 → 128 channels), a 256-channel bottleneck, and four decoder stages. Each skip connection passes through an attention gate before concatenation. Convolution blocks are two 3×3×3 convs with instance norm, ReLU and 3D dropout (p=0.1). A 1×1×1 conv produces the single-channel logit map. An optional bottleneck DNN is left commented out in the code, which the checkpoint name `noDNN` refers to.
+
+## Preprocessing
+
+- Intensities are clipped to the 1st–99th percentile, then min-max scaled to [0, 1] (`robust_normalize`).
+- Volumes are resized to 64×64×64 (trilinear for images, nearest for masks).
+
+## Results
+
+Best validation IoU during training was **0.9306** at epoch 398. Training stopped early at epoch 438. See [loss_curves.png](loss_curves.png) and [iou_curves.png](iou_curves.png). Run `final_results_val_test.py` to reproduce the validation and test Dice/IoU.
+
+## Notes
+
+- Paths in [inference.py](inference.py) are hard-coded and must be edited.
+- The dataset is not included in the repository's tracked files. Provide your own fetal MRI volumes and labels.
+- No license file is present. Add one before redistributing.
